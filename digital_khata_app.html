@@ -1237,7 +1237,7 @@
                 <button class="btn btn-google" onclick="signInWithGoogle()" style="width: 100%; padding: 12px; background: white; color: #444; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-weight: 500; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;"
                         onmouseover="this.style.borderColor='#c6c6c6'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" 
                         onmouseout="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none'">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" style="width: 18px; height: 18px;">
+                    <img src="google_logo.svg" alt="Google" style="width: 18px; height: 18px;">
                     Continue with Google
                 </button>
                 
@@ -2092,17 +2092,24 @@
 
         // Month Navigation
         function changeMonth(delta) {
-            currentReportMonth.setMonth(currentReportMonth.getMonth() + delta);
+            currentReportMonth += delta;
+            if (currentReportMonth > 11) {
+                currentReportMonth = 0;
+                currentReportYear++;
+            } else if (currentReportMonth < 0) {
+                currentReportMonth = 11;
+                currentReportYear--;
+            }
             updateMonthDisplay();
             renderReportTransactions();
         }
 
         function updateMonthDisplay() {
             const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            document.getElementById('currentMonth').textContent = `${months[currentReportMonth.getMonth()]} ${currentReportMonth.getFullYear()}`;
+            document.getElementById('currentMonth').textContent = `${months[currentReportMonth]} ${currentReportYear}`;
 
-            const monthStr = currentReportMonth.toISOString().slice(0, 7);
-            const monthTxns = transactions.filter(t => t.date.startsWith(monthStr));
+            const monthStr = `${currentReportYear}-${(currentReportMonth + 1).toString().padStart(2, '0')}`;
+            const monthTxns = transactions.filter(t => t.date && t.date.startsWith(monthStr));
 
             const received = monthTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
             const paid = monthTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
