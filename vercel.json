@@ -2,8 +2,20 @@
   "version": 2,
   "builds": [
     {
-      "src": "*.html",
+      "src": "digital_khata_app.html",
       "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/digital_khata_app.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+      ]
     }
   ]
 }
