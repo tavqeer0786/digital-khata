@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Digital Khata - Transaction Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #fff;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .header-icons i {
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .header-icons i:active {
+            transform: scale(0.9);
+        }
+
+        /* Balance Card */
+        .balance-card {
+            background: white;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .balance-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .balance-item {
+            text-align: center;
+        }
+
+        .balance-label {
+            font-size: 12px;
+            color: #666;
+            font-family: 'Open Sans', sans-serif;
+            margin-bottom: 5px;
+        }
+
+        .balance-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .balance-value.received {
+            color: #10b981;
+        }
+
+        .balance-value.paid {
+            color: #ef4444;
+        }
+
+        .balance-value.net {
+            color: #667eea;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+            background: #f0f0ff;
+        }
+
+        .nav-item i {
+            font-size: 22px;
+        }
+
+        .nav-item span {
+            font-size: 11px;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 0 16px 100px 16px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            z-index: 99;
+            transition: transform 0.2s;
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        /* Transaction Card */
+        .transaction-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .transaction-card.received {
+            border-left-color: #10b981;
+        }
+
+        .transaction-card.paid {
+            border-left-color: #ef4444;
+        }
+
+        .transaction-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+        }
+
+        .transaction-icon.received {
+            background: #10b981;
+        }
+
+        .transaction-icon.paid {
+            background: #ef4444;
+        }
+
+        .transaction-details {
+            flex: 1;
+        }
+
+        .transaction-person {
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .transaction-note {
+            font-size: 12px;
+            color: #666;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .transaction-amount {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .transaction-amount.received {
+            color: #10b981;
+        }
+
+        .transaction-amount.paid {
+            color: #ef4444;
+        }
+
+        .transaction-date {
+            font-size: 11px;
+            color: #999;
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        /* Person Card */
+        .person-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .person-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .person-details {
+            flex: 1;
+        }
+
+        .person-name {
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .person-mobile {
+            font-size: 12px;
+            color: #666;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .person-balance {
+            text-align: right;
+        }
+
+        .person-balance-label {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .person-balance-value {
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .person-balance-value.positive {
+            color: #10b981;
+        }
+
+        .person-balance-value.negative {
+            color: #ef4444;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: flex-end;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            max-height: 90%;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+            font-family: 'Open Sans', sans-serif;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e5e5e5;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e5e5e5;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Roboto', sans-serif;
+            background: white;
+            cursor: pointer;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Radio Group */
+        .radio-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .radio-option {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e5e5;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .radio-option.active {
+            border-color: #667eea;
+            background: #f0f0ff;
+            color: #667eea;
+        }
+
+        /* Button */
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .search-bar i {
+            color: #999;
+        }
+
+        .search-bar input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        /* Filter Chips */
+        .filter-chips {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .filter-chips::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chip {
+            padding: 8px 16px;
+            border: 2px solid #e5e5e5;
+            border-radius: 20px;
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .chip.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state i {
+            font-size: 80px;
+            color: #e5e5e5;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            color: #999;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        /* Ledger View */
+        .ledger-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .ledger-person {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .ledger-balance {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .ledger-entry {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 12px;
+            padding: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+        }
+
+        .ledger-entry:last-child {
+            border-bottom: none;
+        }
+
+        .ledger-date {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .ledger-note {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .ledger-debit, .ledger-credit {
+            font-size: 15px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .ledger-debit {
+            color: #ef4444;
+        }
+
+        .ledger-credit {
+            color: #10b981;
+        }
+
+        /* PIN Screen */
+        .pin-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pin-screen.active {
+            display: flex;
+        }
+
+        .pin-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .pin-box h2 {
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .pin-dots {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .pin-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 2px solid #667eea;
+            transition: background 0.2s;
+        }
+
+        .pin-dot.filled {
+            background: #667eea;
+        }
+
+        .pin-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pin-key {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #e5e5e5;
+            background: white;
+            font-size: 24px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pin-key:active {
+            background: #f0f0ff;
+            border-color: #667eea;
+            transform: scale(0.95);
+        }
+
+        .pin-error {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        /* Settings */
+        .settings-section {
+            margin-bottom: 30px;
+        }
+
+        .settings-title {
+            font-size: 14px;
+            color: #999;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .settings-item {
+            background: white;
+            padding: 16px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            cursor: pointer;
+        }
+
+        .settings-item:active {
+            transform: scale(0.98);
+        }
+
+        .settings-item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .settings-item-left i {
+            font-size: 20px;
+            color: #667eea;
+            width: 30px;
+        }
+
+        .settings-item-text h4 {
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .settings-item-text p {
+            font-size: 12px;
+            color: #999;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        /* Month Selector */
+        .month-selector {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .month-selector i {
+            font-size: 20px;
+            color: #667eea;
+            cursor: pointer;
+        }
+
+        .month-selector span {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Bill View */
+        .bill-container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+        }
+
+        .bill-header {
+            text-align: center;
+            border-bottom: 2px dashed #e5e5e5;
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+        }
+
+        .bill-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .bill-subtitle {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .bill-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .bill-row:last-child {
+            border-bottom: none;
+        }
+
+        .bill-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .bill-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .bill-amount {
+            background: #f0f0ff;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        .bill-amount-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .bill-amount-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- PIN Lock Screen -->
+        <div class="pin-screen" id="pinScreen">
+            <div class="pin-box">
+                <h2>Enter PIN</h2>
+                <div class="pin-dots">
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                </div>
+                <div class="pin-keypad">
+                    <button class="pin-key" onclick="pinInput(1)">1</button>
+                    <button class="pin-key" onclick="pinInput(2)">2</button>
+                    <button class="pin-key" onclick="pinInput(3)">3</button>
+                    <button class="pin-key" onclick="pinInput(4)">4</button>
+                    <button class="pin-key" onclick="pinInput(5)">5</button>
+                    <button class="pin-key" onclick="pinInput(6)">6</button>
+                    <button class="pin-key" onclick="pinInput(7)">7</button>
+                    <button class="pin-key" onclick="pinInput(8)">8</button>
+                    <button class="pin-key" onclick="pinInput(9)">9</button>
+                    <button class="pin-key" onclick="pinClear()">✕</button>
+                    <button class="pin-key" onclick="pinInput(0)">0</button>
+                    <button class="pin-key" onclick="pinBackspace()">⌫</button>
+                </div>
+                <div class="pin-error" id="pinError"></div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-book"></i> Digital Khata</h1>
+            <div class="header-icons">
+                <i class="fas fa-search" onclick="showSearch()"></i>
+                <i class="fas fa-cog" onclick="showScreen('settings')"></i>
+            </div>
+        </div>
+
+        <!-- Balance Card -->
+        <div class="balance-card">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <span style="font-size: 14px; color: #666;">Current Month</span>
+            </div>
+            <div class="balance-grid">
+                <div class="balance-item">
+                    <div class="balance-label">Received</div>
+                    <div class="balance-value received" id="totalReceived">₹0</div>
+                </div>
+                <div class="balance-item">
+                    <div class="balance-label">Paid</div>
+                    <div class="balance-value paid" id="totalPaid">₹0</div>
+                </div>
+                <div class="balance-item">
+                    <div class="balance-label">Net</div>
+                    <div class="balance-value net" id="netBalance">₹0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Home Screen -->
+            <div class="screen active" id="homeScreen">
+                <h3 style="margin-bottom: 12px; font-size: 16px;">Recent Transactions</h3>
+                <div id="transactionsList"></div>
+            </div>
+
+            <!-- Parties Screen -->
+            <div class="screen" id="partiesScreen">
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search parties..." id="partySearch" oninput="filterParties()">
+                </div>
+                <div id="partiesList"></div>
+            </div>
+
+            <!-- Reports Screen -->
+            <div class="screen" id="reportsScreen">
+                <div class="month-selector">
+                    <i class="fas fa-chevron-left" onclick="changeMonth(-1)"></i>
+                    <span id="currentMonth"></span>
+                    <i class="fas fa-chevron-right" onclick="changeMonth(1)"></i>
+                </div>
+
+                <div class="balance-card">
+                    <h3 style="margin-bottom: 15px; font-size: 16px;">Monthly Summary</h3>
+                    <div class="balance-grid">
+                        <div class="balance-item">
+                            <div class="balance-label">Received</div>
+                            <div class="balance-value received" id="monthReceived">₹0</div>
+                        </div>
+                        <div class="balance-item">
+                            <div class="balance-label">Paid</div>
+                            <div class="balance-value paid" id="monthPaid">₹0</div>
+                        </div>
+                        <div class="balance-item">
+                            <div class="balance-label">Net</div>
+                            <div class="balance-value net" id="monthNet">₹0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-chips">
+                    <div class="chip active" data-filter="all" onclick="filterReportTransactions('all')">All</div>
+                    <div class="chip" data-filter="received" onclick="filterReportTransactions('received')">Received</div>
+                    <div class="chip" data-filter="paid" onclick="filterReportTransactions('paid')">Paid</div>
+                    <div class="chip" data-filter="upi" onclick="filterReportTransactions('upi')">UPI</div>
+                    <div class="chip" data-filter="cash" onclick="filterReportTransactions('cash')">Cash</div>
+                    <div class="chip" data-filter="bank" onclick="filterReportTransactions('bank')">Bank</div>
+                </div>
+
+                <div id="reportTransactionsList"></div>
+            </div>
+
+            <!-- Settings Screen -->
+            <div class="screen" id="settingsScreen">
+                <div class="settings-section">
+                    <div class="settings-title">DATA MANAGEMENT</div>
+                    <div class="settings-item" onclick="exportCSV()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-download"></i>
+                            <div class="settings-item-text">
+                                <h4>Export Data</h4>
+                                <p>Download transactions as CSV</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                    </div>
+                    <div class="settings-item" onclick="clearAllData()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-trash" style="color: #ef4444;"></i>
+                            <div class="settings-item-text">
+                                <h4>Clear All Data</h4>
+                                <p>Delete all transactions & parties</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">SECURITY</div>
+                    <div class="settings-item" onclick="changePIN()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-lock"></i>
+                            <div class="settings-item-text">
+                                <h4>Change PIN</h4>
+                                <p>Update your app lock PIN</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">ABOUT</div>
+                    <div class="settings-item">
+                        <div class="settings-item-left">
+                            <i class="fas fa-info-circle"></i>
+                            <div class="settings-item-text">
+                                <h4>Version</h4>
+                                <p>Digital Khata v1.1 (PDF Support)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <div class="fab" onclick="openAddTransactionModal()">
+            <i class="fas fa-plus"></i>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="showScreen('home')">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+            <div class="nav-item" onclick="showScreen('parties')">
+                <i class="fas fa-users"></i>
+                <span>Parties</span>
+            </div>
+            <div class="nav-item" onclick="showScreen('reports')">
+                <i class="fas fa-chart-line"></i>
+                <span>Reports</span>
+            </div>
+        </div>
+
+        <!-- Add Transaction Modal -->
+        <div class="modal" id="addTransactionModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add Transaction</h2>
+                    <i class="fas fa-times modal-close" onclick="closeModal('addTransactionModal')"></i>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="addTransaction(event)">
+                        <div class="form-group">
+                            <label class="form-label">Amount (₹)</label>
+                            <input type="number" class="form-input" id="txnAmount" placeholder="Enter amount" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Type</label>
+                            <div class="radio-group">
+                                <div class="radio-option active" data-type="received" onclick="selectType('received')">
+                                    <i class="fas fa-arrow-down"></i> Received
+                                </div>
+                                <div class="radio-option" data-type="paid" onclick="selectType('paid')">
+                                    <i class="fas fa-arrow-up"></i> Paid
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Party / Person</label>
+                            <select class="form-select" id="txnPerson" required>
+                                <option value="">Select or add new</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Payment Mode</label>
+                            <select class="form-select" id="txnMode">
+                                <option value="upi">UPI (PhonePe/GPay)</option>
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank Transfer</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-input" id="txnDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Note / Remark</label>
+                            <input type="text" class="form-input" id="txnNote" placeholder="Optional">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Save Transaction
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Party Modal -->
+        <div class="modal" id="addPartyModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New Party</h2>
+                    <i class="fas fa-times modal-close" onclick="closeModal('addPartyModal')"></i>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="addParty(event)">
+                        <div class="form-group">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-input" id="partyName" placeholder="Enter name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Mobile Number (Optional)</label>
+                            <input type="tel" class="form-input" id="partyMobile" placeholder="Enter mobile number">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Notes (Optional)</label>
+                            <input type="text" class="form-input" id="partyNotes" placeholder="Additional info">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Add Party
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ledger Modal -->
+        <div class="modal" id="ledgerModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Party Ledger</h2>
+                    <i class="fas fa-times modal-close" onclick="closeModal('ledgerModal')"></i>
+                </div>
+                <div class="modal-body">
+                    <div class="ledger-header">
+                        <div class="ledger-person" id="ledgerPersonName"></div>
+                        <div class="ledger-balance" id="ledgerBalance"></div>
+                    </div>
+
+                    <div class="card" style="padding: 0; overflow: hidden;">
+                        <div id="ledgerEntries"></div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="exportPartyPDF()" style="margin-top: 16px;">
+                        <i class="fas fa-file-pdf"></i> Export Party Ledger as PDF
+                    </button>
+
+                    <button class="btn btn-danger" onclick="deleteParty()" style="margin-top: 16px;">
+                        <i class="fas fa-trash"></i> Delete Party
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bill Modal -->
+        <div class="modal" id="billModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Transaction Bill</h2>
+                    <i class="fas fa-times modal-close" onclick="closeModal('billModal')"></i>
+                </div>
+                <div class="modal-body">
+                    <div class="bill-container" id="billContent"></div>
+                    <button class="btn btn-secondary" onclick="shareScreenshot()">
+                        <i class="fas fa-share-alt"></i> Take Screenshot to Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal active" id="loginScreen" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div class="modal-content" style="max-width: 400px; width: 90%; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
+            <div class="modal-header" style="background: white; padding: 30px 25px 20px; text-align: center;">
+                <div style="width: 80px; height: 80px; background: #f0f2ff; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                    <i class="fas fa-wallet" style="font-size: 40px; color: #667eea;"></i>
+                </div>
+                <h2 style="margin: 10px 0 5px; color: #333; font-weight: 700;">Digital Khata</h2>
+                <p style="color: #666; font-size: 14px; margin: 0;">Manage your transactions with ease</p>
+            </div>
+            
+            <div class="modal-body" style="background: #f8f9ff; padding: 25px; text-align: center;">
+                <div id="loginError" class="error-message" style="color: #ff4d4f; background: #fff2f0; padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 13px; border-left: 3px solid #ff4d4f;"></div>
+                
+                <div class="form-group" style="margin-bottom: 15px; text-align: left;">
+                    <label for="email" style="display: block; margin-bottom: 5px; font-size: 13px; color: #555; font-weight: 500;">Email Address</label>
+                    <div style="position: relative;">
+                        <i class="fas fa-envelope" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="email" id="email" class="form-control" placeholder="Enter your email" style="width: 100%; padding: 12px 15px 12px 40px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#ddd'">
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label for="password" style="font-size: 13px; color: #555; font-weight: 500;">Password</label>
+                        <a href="#" onclick="showForgotPassword()" style="font-size: 12px; color: #667eea; text-decoration: none;">Forgot?</a>
+                    </div>
+                    <div style="position: relative;">
+                        <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="password" id="password" class="form-control" placeholder="Enter password" style="width: 100%; padding: 12px 15px 12px 40px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#ddd'">
+                        <i class="fas fa-eye-slash" id="togglePassword" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #999; cursor: pointer;" onclick="togglePasswordVisibility()"></i>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="login()" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; margin: 10px 0 20px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);" 
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.5)'" 
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102, 126, 234, 0.4)'">
+                    Sign In
+                </button>
+                
+                <div style="margin: 20px 0; position: relative;">
+                    <div style="height: 1px; background: #e0e0e0; position: relative;">
+                        <span style="background: #f8f9ff; padding: 0 15px; position: relative; top: -9px; color: #999; font-size: 12px;">OR CONTINUE WITH</span>
+                    </div>
+                </div>
+                
+                <button class="btn btn-google" onclick="signInWithGoogle()" style="width: 100%; padding: 12px; background: white; color: #444; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-weight: 500; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;"
+                        onmouseover="this.style.borderColor='#c6c6c6'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" 
+                        onmouseout="this.style.borderColor='#e0e0e0'; this.style.boxShadow='none'">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" style="width: 18px; height: 18px;">
+                    Continue with Google
+                </button>
+                
+                <div style="font-size: 13px; color: #666; margin-top: 20px;">
+                    Don't have an account? 
+                    <a href="#" onclick="document.getElementById('email').focus(); document.getElementById('loginError').style.display='none'; document.querySelector('.login-form').style.display='none'; document.querySelector('.signup-form').style.display='block'; return false;" style="color: #667eea; font-weight: 600; text-decoration: none;">Sign up</a>
+                </div>
+                
+                <div class="signup-form" style="display: none;">
+                    <div style="margin: 20px 0;">
+                        <button class="btn btn-secondary" onclick="signup()" style="width: 100%; padding: 14px; background: white; color: #667eea; border: 1px solid #667eea; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;"
+                                onmouseover="this.style.background='#f0f2ff'" 
+                                onmouseout="this.style.background='white'">
+                            Create Account
+                        </button>
+                    </div>
+                    <div style="font-size: 13px; color: #666;">
+                        Already have an account? 
+                        <a href="#" onclick="document.querySelector('.login-form').style.display='block'; document.querySelector('.signup-form').style.display='none'; return false;" style="color: #667eea; font-weight: 600; text-decoration: none;">Sign in</a>
+                    </div>
+                </div>
+                
+                <div class="login-form">
+                    <div style="font-size: 12px; color: #999; margin-top: 25px; line-height: 1.5; padding: 0 10px;">
+                        By continuing, you agree to our <a href="#" style="color: #667eea; text-decoration: none;">Terms of Service</a> and <a href="#" style="color: #667eea; text-decoration: none;">Privacy Policy</a>.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-content {
+            animation: fadeIn 0.4s ease-out;
+             position: relative;  /* Add this */
+             top: -30px;          /* Move up by 30px - adjust this value as needed */
+             margin: 0 auto;   
+        }
+        
+        input:focus {
+            outline: none;
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+    
+    <script>
+        // Toggle password visibility
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const icon = document.getElementById('togglePassword');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            }
+        }
+        
+        // Show forgot password modal
+        function showForgotPassword() {
+            const email = document.getElementById('email').value || '';
+            const message = email ? `We'll send a password reset link to ${email}` : 'Enter your email to receive a password reset link';
+            
+            Swal.fire({
+                title: 'Reset Password',
+                html: `
+                    <p style="color: #666; margin-bottom: 20px;">${message}</p>
+                    <input type="email" id="resetEmail" class="swal2-input" placeholder="Your email address" value="${email}" style="width: 80%; margin: 10px auto; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px;">
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Send Reset Link',
+                confirmButtonColor: '#667eea',
+                cancelButtonText: 'Cancel',
+                showLoaderOnConfirm: true,
+                preConfirm: () => {
+                    const resetEmail = document.getElementById('resetEmail').value;
+                    if (!resetEmail) {
+                        Swal.showValidationMessage('Please enter your email address');
+                        return false;
+                    }
+                    return auth.sendPasswordResetEmail(resetEmail)
+                        .then(() => {
+                            return 'Password reset email sent! Check your inbox.';
+                        })
+                        .catch(error => {
+                            Swal.showValidationMessage(`Error: ${error.message}`);
+                        });
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Email Sent!',
+                        text: result.value,
+                        icon: 'success',
+                        confirmButtonColor: '#667eea'
+                    });
+                }
+            });
+        }
+    </script>
+
+    <div id="mainApp">
+        <!-- Your existing app content will be shown here after login -->
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDeUWB4tNuywsYU-JnXs-ApHy8SuqJKJRQ",
+            authDomain: "digital-khata-01.firebaseapp.com",
+            databaseURL: "https://digital-khata-01-default-rtdb.firebaseio.com",
+            projectId: "digital-khata-01",
+            storageBucket: "digital-khata-01.appspot.com",
+            messagingSenderId: "432824776296",
+            appId: "1:432824776296:web:24117f37efaa0407aa2ddd"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+
+        // Data Storage
+        let transactions = [];
+        let parties = [];
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let currentPartyId = null;
+        let currentScreen = 'home';
+        let pinAttempts = 0;
+        const MAX_PIN_ATTEMPTS = 5;
+        let currentUser = null;
+        let currentLedgerParty = null;
+
+        // Initialize App
+        function initApp() {
+            // Check authentication state
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    // User is signed in
+                    currentUser = user;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    loadData();
+                    updateMonthDisplay();
+                    renderTransactions();
+                    renderParties();
+                    setTodayDate();
+                    loadPartyDropdown();
+                    checkPINSetup();
+                } else {
+                    // No user is signed in
+                    document.getElementById('loginScreen').style.display = 'flex';
+                    document.getElementById('mainApp').style.display = 'none';
+                }
+            });
+        }
+
+        // PIN Management
+        function checkPINSetup() {
+            const savedPIN = localStorage.getItem('appPIN');
+            if (savedPIN) {
+                appPIN = savedPIN;
+                isPINSetup = true;
+                document.getElementById('pinScreen').classList.add('active');
+            }
+        }
+
+        // Load Data from Firebase or Local Storage
+        function loadData() {
+            // First try to load from Firebase if user is logged in
+            if (currentUser) {
+                const userRef = database.ref('users/' + currentUser.uid);
+                
+                // Load transactions
+                userRef.child('transactions').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // Convert object to array and sort by date (newest first)
+                        transactions = Object.values(data).sort((a, b) => {
+                            return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
+                        });
+                        
+                        // Save to localStorage as backup
+                        localStorage.setItem('transactions', JSON.stringify(transactions));
+                        
+                        renderTransactions();
+                        updateBalance();
+                    } else if (localStorage.getItem('transactions')) {
+                        // If no data in Firebase but have local data, sync it
+                        transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+                        saveData(); // This will upload local data to Firebase
+                    }
+                });
+                
+                // Load parties
+                userRef.child('parties').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        parties = Object.values(data);
+                        // Save to localStorage as backup
+                        localStorage.setItem('parties', JSON.stringify(parties));
+                        
+                        renderParties();
+                        loadPartyDropdown();
+                    } else if (localStorage.getItem('parties')) {
+                        // If no data in Firebase but have local data, sync it
+                        parties = JSON.parse(localStorage.getItem('parties') || '[]');
+                        saveData(); // This will upload local data to Firebase
+                    }
+                });
+            } else {
+                // If not logged in, try to load from local storage
+                const savedTransactions = localStorage.getItem('transactions');
+                const savedParties = localStorage.getItem('parties');
+                
+                if (savedTransactions) {
+                    transactions = JSON.parse(savedTransactions);
+                    renderTransactions();
+                    updateBalance();
+                }
+                
+                if (savedParties) {
+                    parties = JSON.parse(savedParties);
+                    renderParties();
+                    loadPartyDropdown();
+                }
+            }
+        }
+
+        // Save Data to Firebase
+        async function saveData() {
+            if (!currentUser) {
+                console.log('No user logged in. Data will be saved to local storage only.');
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                localStorage.setItem('parties', JSON.stringify(parties));
+                return false;
+            }
+            
+            try {
+                const userRef = database.ref('users/' + currentUser.uid);
+                
+                // Save transactions to Firebase
+                const transactionsRef = userRef.child('transactions');
+                const transactionsObj = {};
+                transactions.forEach(txn => {
+                    transactionsObj[txn.id] = txn;
+                });
+                await transactionsRef.update(transactionsObj);
+                
+                // Save parties to Firebase
+                const partiesRef = userRef.child('parties');
+                const partiesObj = {};
+                parties.forEach(party => {
+                    partiesObj[party.id] = party;
+                });
+                await partiesRef.update(partiesObj);
+                
+                // Also save to localStorage as backup
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                localStorage.setItem('parties', JSON.stringify(parties));
+                
+                console.log('Data saved to Firebase');
+                return true;
+            } catch (error) {
+                console.error('Error saving data to Firebase:', error);
+                // Fallback to local storage if online save fails
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                localStorage.setItem('parties', JSON.stringify(parties));
+                return false;
+            }
+        }
+
+        // Navigation
+        function showScreen(screen) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+            document.getElementById(screen + 'Screen').classList.add('active');
+            document.querySelector(`[onclick="showScreen('${screen}')"]`).classList.add('active');
+
+            if (screen === 'home') {
+                renderTransactions();
+                updateBalance();
+            } else if (screen === 'parties') {
+                renderParties();
+            } else if (screen === 'reports') {
+                updateMonthDisplay();
+                renderReportTransactions();
+            }
+        }
+
+        // Modal Functions
+        function openAddTransactionModal() {
+            document.getElementById('addTransactionModal').classList.add('active');
+            loadPartyDropdown();
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Transaction Type Selection
+        function selectType(type) {
+            currentTransactionType = type;
+            document.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
+            document.querySelector(`[data-type="${type}"]`).classList.add('active');
+        }
+
+        // Set Today's Date
+        function setTodayDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('txnDate').value = today;
+        }
+
+        // Load Party Dropdown
+        function loadPartyDropdown() {
+            const select = document.getElementById('txnPerson');
+            select.innerHTML = '<option value="">Select party</option>';
+            select.innerHTML += '<option value="__new__">+ Add New Party</option>';
+
+            parties.forEach(party => {
+                select.innerHTML += `<option value="${party.id}">${party.name}</option>`;
+            });
+
+            select.onchange = function() {
+                if (this.value === '__new__') {
+                    closeModal('addTransactionModal');
+                    document.getElementById('addPartyModal').classList.add('active');
+                }
+            };
+        }
+
+        // Add Party
+        async function addParty(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('partyName').value.trim();
+            const mobile = document.getElementById('partyMobile').value.trim();
+            const address = document.getElementById('partyAddress').value.trim();
+            
+            if (!name) {
+                alert('Please enter party name');
+                return;
+            }
+            
+            const party = {
+                id: Date.now().toString(),
+                name: name,
+                mobile: mobile,
+                address: address,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            try {
+                parties.push(party);
+                const success = await saveData();
+                
+                if (success) {
+                    renderParties();
+                    loadPartyDropdown();
+                    closeModal('addPartyModal');
+                    document.getElementById('addPartyForm').reset();
+                }
+            } catch (error) {
+                console.error('Error adding party:', error);
+                alert('Failed to add party. Please try again.');
+            }
+        }
+
+        // Add Transaction
+        async function addTransaction(e) {
+            e.preventDefault();
+
+            const type = document.querySelector('.type-btn.active').dataset.type;
+            const partyId = document.getElementById('txnPerson').value;
+            const amount = parseFloat(document.getElementById('txnAmount').value);
+            const note = document.getElementById('txnNote').value;
+            const date = document.getElementById('txnDate').value;
+            
+            if (!partyId || isNaN(amount) || amount <= 0) {
+                alert('Please fill in all fields correctly');
+                return;
+            }
+            
+            const transaction = {
+                id: Date.now().toString(),
+                partyId: partyId,
+                type: type,
+                amount: amount,
+                note: note,
+                date: date || new Date().toISOString().split('T')[0],
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            try {
+                transactions.unshift(transaction);
+                const success = await saveData();
+                
+                if (success) {
+                    renderTransactions();
+                    updateBalance();
+                    closeModal('addTransactionModal');
+                    document.getElementById('addTransactionForm').reset();
+                }
+            } catch (error) {
+                console.error('Error adding transaction:', error);
+                alert('Failed to add transaction. Please try again.');
+            }
+        }
+
+        // Render Transactions
+        function renderTransactions() {
+            const container = document.getElementById('transactionsList');
+
+            if (transactions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-receipt"></i>
+                        <h3>No Transactions</h3>
+                        <p>Tap + button to add your first transaction</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const recent = sorted.slice(0, 20);
+
+            container.innerHTML = recent.map(txn => `
+                <div class="card transaction-card ${txn.type}" onclick="showBill(${txn.id})">
+                    <div class="transaction-icon ${txn.type}">
+                        <i class="fas fa-${txn.type === 'received' ? 'arrow-down' : 'arrow-up'}"></i>
+                    </div>
+                    <div class="transaction-details">
+                        <div class="transaction-person">${txn.person}</div>
+                        <div class="transaction-note">
+                            ${txn.note || txn.mode.toUpperCase()} • ${formatDate(txn.date)}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="transaction-amount ${txn.type}">
+                            ${txn.type === 'received' ? '+' : '-'}₹${txn.amount.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Parties
+        function renderParties() {
+            const container = document.getElementById('partiesList');
+
+            if (parties.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h3>No Parties Added</h3>
+                        <p>Add parties to track transactions</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const partiesWithBalance = parties.map(party => {
+                const partyTxns = transactions.filter(t => t.partyId === party.id);
+                const received = partyTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
+                const paid = partyTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
+                const balance = received - paid;
+
+                return { ...party, balance, transactionCount: partyTxns.length };
+            }).sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+
+            container.innerHTML = partiesWithBalance.map(party => `
+                <div class="card person-card" onclick="showLedger(${party.id})">
+                    <div class="person-avatar">${party.name.charAt(0).toUpperCase()}</div>
+                    <div class="person-details">
+                        <div class="person-name">${party.name}</div>
+                        <div class="person-mobile">
+                            ${party.mobile || 'No mobile'} • ${party.transactionCount} transactions
+                        </div>
+                    </div>
+                    <div class="person-balance">
+                        <div class="person-balance-label">Balance</div>
+                        <div class="person-balance-value ${party.balance >= 0 ? 'positive' : 'negative'}">
+                            ${party.balance >= 0 ? '+' : ''}₹${Math.abs(party.balance).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Filter Parties
+        function filterParties() {
+            const search = document.getElementById('partySearch').value.toLowerCase();
+            const cards = document.querySelectorAll('.person-card');
+
+            cards.forEach(card => {
+                const name = card.querySelector('.person-name').textContent.toLowerCase();
+                card.style.display = name.includes(search) ? 'flex' : 'none';
+            });
+        }
+
+        // Show Ledger
+        function showLedger(partyId) {
+            currentLedgerParty = parties.find(p => p.id === partyId);
+            if (!currentLedgerParty) return;
+
+            const partyTxns = transactions.filter(t => t.partyId === partyId).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const received = partyTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
+            const paid = partyTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
+            const balance = received - paid;
+
+            document.getElementById('ledgerPersonName').textContent = currentLedgerParty.name;
+            document.getElementById('ledgerBalance').textContent = `Balance: ${balance >= 0 ? '+' : ''}₹${Math.abs(balance).toLocaleString()}`;
+
+            const entriesContainer = document.getElementById('ledgerEntries');
+
+            if (partyTxns.length === 0) {
+                entriesContainer.innerHTML = '<div class="empty-state"><p>No transactions found</p></div>';
+            } else {
+                entriesContainer.innerHTML = partyTxns.map(txn => `
+                    <div class="ledger-entry">
+                        <div class="ledger-date">${formatDate(txn.date)}</div>
+                        <div class="ledger-note">${txn.note || txn.mode.toUpperCase()}</div>
+                        <div class="${txn.type === 'paid' ? 'ledger-debit' : 'ledger-credit'}">
+                            ${txn.type === 'paid' ? '₹' + txn.amount.toLocaleString() : '-'}
+                        </div>
+                        <div class="${txn.type === 'received' ? 'ledger-credit' : 'ledger-debit'}">
+                            ${txn.type === 'received' ? '₹' + txn.amount.toLocaleString() : '-'}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('ledgerModal').classList.add('active');
+        }
+
+        // Export Party Ledger to PDF
+        function exportPartyPDF() {
+            if (!currentLedgerParty) return;
+
+            const partyTxns = transactions.filter(t => t.partyId === currentLedgerParty.id)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (partyTxns.length === 0) {
+                alert('No transactions to export for this party');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Calculate totals
+            const received = partyTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
+            const paid = partyTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
+            const balance = received - paid;
+
+            // Header
+            doc.setFillColor(102, 126, 234);
+            doc.rect(0, 0, 210, 40, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont(undefined, 'bold');
+            doc.text('Digital Khata', 105, 15, { align: 'center' });
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'normal');
+            doc.text('Transaction Ledger Report', 105, 25, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.text('Generated on: ' + new Date().toLocaleDateString('en-IN'), 105, 33, { align: 'center' });
+
+            // Party Info
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text('Party Name: ' + currentLedgerParty.name, 15, 50);
+
+            if (currentLedgerParty.mobile) {
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.text('Mobile: ' + currentLedgerParty.mobile, 15, 58);
+            }
+
+            // Summary Box
+            let yPos = currentLedgerParty.mobile ? 70 : 62;
+            doc.setDrawColor(200, 200, 200);
+            doc.setFillColor(245, 245, 245);
+            doc.roundedRect(15, yPos, 180, 35, 3, 3, 'FD');
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(100, 100, 100);
+            doc.text('SUMMARY', 20, yPos + 8);
+
+            // Summary details
+            yPos += 15;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+
+            doc.setTextColor(16, 185, 129);
+            doc.text('Total Received:', 20, yPos);
+            doc.text('₹' + received.toLocaleString(), 70, yPos);
+
+            yPos += 7;
+            doc.setTextColor(239, 68, 68);
+            doc.text('Total Paid:', 20, yPos);
+            doc.text('₹' + paid.toLocaleString(), 70, yPos);
+
+            yPos += 7;
+            doc.setTextColor(102, 126, 234);
+            doc.setFont(undefined, 'bold');
+            doc.text('Net Balance:', 20, yPos);
+            doc.text((balance >= 0 ? '+' : '') + '₹' + Math.abs(balance).toLocaleString(), 70, yPos);
+
+            // Transaction Table Header
+            yPos += 15;
+            doc.setFillColor(240, 240, 255);
+            doc.rect(15, yPos, 180, 10, 'F');
+
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.text('Date', 20, yPos + 7);
+            doc.text('Description', 50, yPos + 7);
+            doc.text('Paid', 130, yPos + 7, { align: 'right' });
+            doc.text('Received', 170, yPos + 7, { align: 'right' });
+
+            // Transaction Rows
+            yPos += 15;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+
+            partyTxns.forEach((txn, index) => {
+                // Check if we need a new page
+                if (yPos > 270) {
+                    doc.addPage();
+                    yPos = 20;
+
+                    // Repeat header on new page
+                    doc.setFillColor(240, 240, 255);
+                    doc.rect(15, yPos - 5, 180, 10, 'F');
+                    doc.setFont(undefined, 'bold');
+                    doc.text('Date', 20, yPos + 2);
+                    doc.text('Description', 50, yPos + 2);
+                    doc.text('Paid', 130, yPos + 2, { align: 'right' });
+                    doc.text('Received', 170, yPos + 2, { align: 'right' });
+                    yPos += 10;
+                    doc.setFont(undefined, 'normal');
+                }
+
+                // Alternating row colors
+                if (index % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(15, yPos - 5, 180, 9, 'F');
+                }
+
+                doc.setTextColor(100, 100, 100);
+                doc.text(formatDatePDF(txn.date), 20, yPos);
+
+                doc.setTextColor(0, 0, 0);
+                const desc = txn.note || txn.mode.toUpperCase();
+                const maxWidth = 70;
+                const descText = doc.splitTextToSize(desc, maxWidth);
+                doc.text(descText[0], 50, yPos);
+
+                // Amount columns
+                if (txn.type === 'paid') {
+                    doc.setTextColor(239, 68, 68);
+                    doc.text('₹' + txn.amount.toLocaleString(), 130, yPos, { align: 'right' });
+                    doc.setTextColor(0, 0, 0);
+                    doc.text('-', 170, yPos, { align: 'right' });
+                } else {
+                    doc.setTextColor(0, 0, 0);
+                    doc.text('-', 130, yPos, { align: 'right' });
+                    doc.setTextColor(16, 185, 129);
+                    doc.text('₹' + txn.amount.toLocaleString(), 170, yPos, { align: 'right' });
+                }
+
+                yPos += 9;
+            });
+
+            // Footer line
+            yPos += 5;
+            if (yPos > 270) {
+                doc.addPage();
+                yPos = 20;
+            }
+
+            doc.setDrawColor(102, 126, 234);
+            doc.setLineWidth(0.5);
+            doc.line(15, yPos, 195, yPos);
+
+            yPos += 8;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text('Final Balance:', 20, yPos);
+
+            doc.setTextColor(balance >= 0 ? 16 : 239, balance >= 0 ? 185 : 68, balance >= 0 ? 129 : 68);
+            doc.text((balance >= 0 ? 'You will receive: ' : 'You will pay: ') + '₹' + Math.abs(balance).toLocaleString(), 60, yPos);
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 150);
+                doc.setFont(undefined, 'normal');
+                doc.text('Page ' + i + ' of ' + pageCount, 105, 290, { align: 'center' });
+                doc.text('Digital Khata - Your Business Ledger Partner', 105, 285, { align: 'center' });
+            }
+
+            // Save PDF
+            const filename = currentLedgerParty.name.replace(/[^a-z0-9]/gi, '_') + '_ledger_' + 
+                           new Date().toISOString().split('T')[0] + '.pdf';
+            doc.save(filename);
+
+            alert('PDF exported successfully!');
+        }
+
+        // Format date for PDF
+        function formatDatePDF(dateStr) {
+            const date = new Date(dateStr);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return day + '/' + month + '/' + year;
+        }
+
+        // Delete Party
+        async function deleteParty() {
+            if (!confirm('Are you sure you want to delete this party and all their transactions?')) {
+                return;
+            }
+            
+            try {
+                const partyId = currentPartyId;
+                parties = parties.filter(p => p.id !== partyId);
+                transactions = transactions.filter(t => t.partyId !== partyId);
+                
+                const success = await saveData();
+                
+                if (success) {
+                    renderParties();
+                    renderTransactions();
+                    updateBalance();
+                    closeModal('ledgerModal');
+                    currentPartyId = null;
+                }
+            } catch (error) {
+                console.error('Error deleting party:', error);
+                alert('Failed to delete party. Please try again.');
+            }
+        }
+
+        // Show Bill
+        function showBill(txnId) {
+            const txn = transactions.find(t => t.id === txnId);
+            if (!txn) return;
+
+            const modeNames = {
+                'upi': 'UPI (PhonePe/GPay)',
+                'cash': 'Cash',
+                'bank': 'Bank Transfer'
+            };
+
+            document.getElementById('billContent').innerHTML = `
+                <div class="bill-header">
+                    <div class="bill-title">Transaction Receipt</div>
+                    <div class="bill-subtitle">Digital Khata</div>
+                </div>
+
+                <div class="bill-row">
+                    <div class="bill-label">Transaction ID</div>
+                    <div class="bill-value">#${txn.id}</div>
+                </div>
+
+                <div class="bill-row">
+                    <div class="bill-label">Date</div>
+                    <div class="bill-value">${formatDate(txn.date)}</div>
+                </div>
+
+                <div class="bill-row">
+                    <div class="bill-label">Party Name</div>
+                    <div class="bill-value">${txn.person}</div>
+                </div>
+
+                <div class="bill-row">
+                    <div class="bill-label">Payment Mode</div>
+                    <div class="bill-value">${modeNames[txn.mode]}</div>
+                </div>
+
+                <div class="bill-row">
+                    <div class="bill-label">Note</div>
+                    <div class="bill-value">${txn.note || '-'}</div>
+                </div>
+
+                <div class="bill-amount">
+                    <div class="bill-amount-label">${txn.type === 'received' ? 'Amount Received' : 'Amount Paid'}</div>
+                    <div class="bill-amount-value" style="color: ${txn.type === 'received' ? '#10b981' : '#ef4444'}">
+                        ${txn.type === 'received' ? '+' : '-'}₹${txn.amount.toLocaleString()}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('billModal').classList.add('active');
+        }
+
+        // Update Balance
+        function updateBalance() {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const monthTxns = transactions.filter(t => t.date.startsWith(currentMonth));
+
+            const received = monthTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
+            const paid = monthTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
+            const net = received - paid;
+
+            document.getElementById('totalReceived').textContent = '₹' + received.toLocaleString();
+            document.getElementById('totalPaid').textContent = '₹' + paid.toLocaleString();
+            document.getElementById('netBalance').textContent = (net >= 0 ? '+' : '') + '₹' + Math.abs(net).toLocaleString();
+        }
+
+        // Month Navigation
+        function changeMonth(delta) {
+            currentReportMonth.setMonth(currentReportMonth.getMonth() + delta);
+            updateMonthDisplay();
+            renderReportTransactions();
+        }
+
+        function updateMonthDisplay() {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('currentMonth').textContent = `${months[currentReportMonth.getMonth()]} ${currentReportMonth.getFullYear()}`;
+
+            const monthStr = currentReportMonth.toISOString().slice(0, 7);
+            const monthTxns = transactions.filter(t => t.date.startsWith(monthStr));
+
+            const received = monthTxns.filter(t => t.type === 'received').reduce((sum, t) => sum + t.amount, 0);
+            const paid = monthTxns.filter(t => t.type === 'paid').reduce((sum, t) => sum + t.amount, 0);
+            const net = received - paid;
+
+            document.getElementById('monthReceived').textContent = '₹' + received.toLocaleString();
+            document.getElementById('monthPaid').textContent = '₹' + paid.toLocaleString();
+            document.getElementById('monthNet').textContent = (net >= 0 ? '+' : '') + '₹' + Math.abs(net).toLocaleString();
+        }
+
+        // Filter Report Transactions
+        function filterReportTransactions(filter) {
+            currentReportFilter = filter;
+
+            document.querySelectorAll('.filter-chips .chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.filter === filter);
+            });
+
+            renderReportTransactions();
+        }
+
+        function renderReportTransactions() {
+            const container = document.getElementById('reportTransactionsList');
+            const monthStr = currentReportMonth.toISOString().slice(0, 7);
+            let filtered = transactions.filter(t => t.date.startsWith(monthStr));
+
+            if (currentReportFilter === 'received') {
+                filtered = filtered.filter(t => t.type === 'received');
+            } else if (currentReportFilter === 'paid') {
+                filtered = filtered.filter(t => t.type === 'paid');
+            } else if (['upi', 'cash', 'bank'].includes(currentReportFilter)) {
+                filtered = filtered.filter(t => t.mode === currentReportFilter);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-filter"></i>
+                        <h3>No Transactions</h3>
+                        <p>No transactions found for selected filter</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const sorted = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            container.innerHTML = sorted.map(txn => `
+                <div class="card transaction-card ${txn.type}" onclick="showBill(${txn.id})">
+                    <div class="transaction-icon ${txn.type}">
+                        <i class="fas fa-${txn.type === 'received' ? 'arrow-down' : 'arrow-up'}"></i>
+                    </div>
+                    <div class="transaction-details">
+                        <div class="transaction-person">${txn.person}</div>
+                        <div class="transaction-note">
+                            ${txn.note || txn.mode.toUpperCase()} • ${formatDate(txn.date)}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="transaction-amount ${txn.type}">
+                            ${txn.type === 'received' ? '+' : '-'}₹${txn.amount.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Export CSV
+        function exportCSV() {
+            if (transactions.length === 0) {
+                alert('No transactions to export');
+                return;
+            }
+
+            let csv = 'Date,Party,Type,Mode,Amount,Note\n';
+
+            transactions.forEach(txn => {
+                csv += `${txn.date},${txn.person},${txn.type},${txn.mode},${txn.amount},"${txn.note || ''}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `digital-khata-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            alert('CSV exported successfully!');
+        }
+
+        // Clear All Data
+        async function clearAllData() {
+            if (!confirm('Are you sure you want to delete all data? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                if (currentUser) {
+                    const userRef = database.ref('users/' + currentUser.uid);
+                    await userRef.remove();
+                }
+                
+                // Clear local data
+                transactions = [];
+                parties = [];
+                localStorage.removeItem('transactions');
+                localStorage.removeItem('parties');
+                
+                renderTransactions();
+                renderParties();
+                updateBalance();
+                
+                alert('All data has been cleared.');
+            } catch (error) {
+                console.error('Error clearing data:', error);
+                alert('Failed to clear data. Please try again.');
+            }
+        }
+
+        // Search
+        function showSearch() {
+            const query = prompt('Search transactions by party name:');
+            if (!query) return;
+
+            const results = transactions.filter(t => 
+                t.person.toLowerCase().includes(query.toLowerCase())
+            );
+
+            if (results.length === 0) {
+                alert('No transactions found');
+                return;
+            }
+
+            showScreen('home');
+            const container = document.getElementById('transactionsList');
+            container.innerHTML = results.map(txn => `
+                <div class="card transaction-card ${txn.type}" onclick="showBill(${txn.id})">
+                    <div class="transaction-icon ${txn.type}">
+                        <i class="fas fa-${txn.type === 'received' ? 'arrow-down' : 'arrow-up'}"></i>
+                    </div>
+                    <div class="transaction-details">
+                        <div class="transaction-person">${txn.person}</div>
+                        <div class="transaction-note">
+                            ${txn.note || txn.mode.toUpperCase()} • ${formatDate(txn.date)}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="transaction-amount ${txn.type}">
+                            ${txn.type === 'received' ? '+' : '-'}₹${txn.amount.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Screenshot Share
+        function shareScreenshot() {
+            alert('Take a screenshot now and share it via WhatsApp, Email, or any app!');
+        }
+
+        // Format Date
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDate();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            return `${day} ${month} ${year}`;
+        }
+
+        // Google Sign In
+        async function signInWithGoogle() {
+            try {
+                const result = await auth.signInWithPopup(provider);
+                // User signed in with Google
+                const user = result.user;
+                console.log('Google sign in successful', user);
+                
+                // Create user data in database if not exists
+                const userRef = database.ref('users/' + user.uid);
+                userRef.once('value').then((snapshot) => {
+                    if (!snapshot.exists()) {
+                        // New user - initialize their data
+                        userRef.set({
+                            email: user.email,
+                            name: user.displayName,
+                            photoURL: user.photoURL,
+                            createdAt: firebase.database.ServerValue.TIMESTAMP,
+                            transactions: {},
+                            parties: {}
+                        });
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Google sign in error:', error);
+                alert('Google sign in failed: ' + error.message);
+            }
+        }
+        
+        // Authentication Functions
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorElement = document.getElementById('loginError');
+            
+            if (!email || !password) {
+                showError('Please enter both email and password');
+                return;
+            }
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // Success - The auth state listener in initApp will handle the UI update
+            } catch (error) {
+                handleAuthError(error);
+            }
+        }
+        
+        async function signup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorElement = document.getElementById('loginError');
+            
+            if (!email || !password) {
+                showError('Please enter both email and password');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError('Password should be at least 6 characters');
+                return;
+            }
+            
+            try {
+                await auth.createUserWithEmailAndPassword(email, password);
+                // Success - The auth state listener in initApp will handle the UI update
+            } catch (error) {
+                handleAuthError(error);
+            }
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('loginError');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        function handleAuthError(error) {
+            let errorMessage = 'An error occurred. Please try again.';
+            
+            switch(error.code) {
+                case 'auth/email-already-in-use':
+                    errorMessage = 'This email is already registered. Please login instead.';
+                    break;
+                case 'auth/user-not-found':
+                    errorMessage = 'No account found with this email. Please sign up first.';
+                    break;
+                case 'auth/wrong-password':
+                    errorMessage = 'Incorrect password. Please try again.';
+                    break;
+                case 'auth/weak-password':
+                    errorMessage = 'Password is too weak. Please use at least 6 characters.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address.';
+                    break;
+                default:
+                    console.error('Auth error:', error);
+            }
+            
+            showError(errorMessage);
+        }
+        
+        // Logout function (you can add a logout button to call this)
+        function logout() {
+            auth.signOut().then(() => {
+                // The auth state listener will handle the UI update
+            }).catch((error) => {
+                console.error('Error signing out:', error);
+            });
+        }
+        
+        // Initialize on load
+        window.onload = function() {
+            // Wrap the container in the mainApp div
+            const container = document.querySelector('.container');
+            const mainApp = document.getElementById('mainApp');
+            if (container && mainApp) {
+                container.parentNode.insertBefore(mainApp, container);
+                mainApp.appendChild(container);
+            }
+            
+            // Initialize the app
+            initApp();
+        };
+    </script>
+</body>
+</html>
